@@ -1,0 +1,138 @@
+name: Autograding Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+env:
+  HIDDEN_TESTS_REPO: ${{ vars.HIDDEN_TESTS_REPO }}
+  HIDDEN_TESTS_REF: ${{ vars.HIDDEN_TESTS_REF }}
+  HIDDEN_TESTS_PATH: ${{ vars.HIDDEN_TESTS_PATH }}
+
+jobs:
+  autograde:
+    name: Run Grading
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout hidden tests
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.HIDDEN_TESTS_REPO }}
+          ref: ${{ env.HIDDEN_TESTS_REF }}
+          token: ${{ secrets.HIDDEN_TESTS_TOKEN }}
+          path: .hidden_tests
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Core inference functions
+        id: core-tests
+        continue-on-error: true
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: Core inference functions
+          setup-command: ""
+          command: uv run pytest "$HIDDEN_TESTS_PATH/test_core.py" "$HIDDEN_TESTS_PATH/test_workflow_modifiable.py" -q
+          timeout: 10
+          max-score: 60
+
+      - name: Rendered report and outputs
+        id: report-tests
+        continue-on-error: true
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: Rendered report and outputs
+          setup-command: ""
+          command: uv run python scripts/run_cleaning.py && uv run python scripts/run_analysis.py && uv run quarto render report/solution.qmd && uv run pytest "$HIDDEN_TESTS_PATH/test_report.py" -q
+          timeout: 15
+          max-score: 40
+
+      - name: Classroom reporter
+        if: always()
+        id: grading-reporter
+        uses: classroom-resources/autograding-grading-reporter@v1
+        env:
+          CORE-TESTS_RESULTS: "${{steps.core-tests.outputs.result}}"
+          REPORT-TESTS_RESULTS: "${{steps.report-tests.outputs.result}}"
+        with:
+          runners: core-tests,report-tests
+
+      - name: Generate feedback content
+        if: always()
+        run: |
+          if [ "$CORE_OUTCOME" = "success" ]; then
+            CORE_SCORE=60; CORE_STATUS="✅"
+          else
+            CORE_SCORE=0; CORE_STATUS="❌"
+          fi
+          if [ "$REPORT_OUTCOME" = "success" ]; then
+            REPORT_SCORE=40; REPORT_STATUS="✅"
+          else
+            REPORT_SCORE=0; REPORT_STATUS="❌"
+          fi
+          TOTAL=$((CORE_SCORE + REPORT_SCORE))
+          {
+            echo "## Autograding Results"
+            echo ""
+            echo "| Component | Status | Points |"
+            echo "|-----------|--------|--------|"
+            echo "| Core inference functions | $CORE_STATUS | $CORE_SCORE/60 |"
+            echo "| Rendered report and outputs | $REPORT_STATUS | $REPORT_SCORE/40 |"
+            echo "| Total |  | $TOTAL/100 |"
+          } > comment.md
+        env:
+          CORE_OUTCOME: ${{ steps.core-tests.outcome }}
+          REPORT_OUTCOME: ${{ steps.report-tests.outcome }}
+
+      - name: Publish run summary
+        if: always()
+        run: cat comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post comment to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('comment.md', 'utf8');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes('Autograding Results'));
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }

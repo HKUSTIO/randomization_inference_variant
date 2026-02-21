@@ -1,0 +1,30 @@
+---
+title: "Randomization Inference Variant Assignment"
+format:
+  html:
+    embed-resources: true
+---
+
+This report documents your implementation of Fisher randomization p-values and Neyman inference with statistic and weighting variants.
+
+Run `python scripts/run_pipeline.py` from the project root. The pipeline must first map `input` to `cleaned` and then map `cleaned` to `output`. Use `output/results.json` to populate the following tables.
+
+## 2. Fisher p-value variants
+
+| statistic_variant | pvalue |
+|---|---:|
+| difference_in_means | |
+| studentized | |
+| stratified_size_weighted | |
+| stratified_equal_weighted | |
+
+## 3. Neyman inference under different weights
+
+| weight_scheme | tau_hat | se_hat | ci_lower | ci_upper |
+|---|---:|---:|---:|---:|
+| size_weighted | | | | |
+| equal_weighted | | | | |
+
+## 4. Brief interpretation
+
+The p-values and confidence intervals differ across statistic and weight choices because each design emphasizes different parts of the outcome distribution and stratum composition.
