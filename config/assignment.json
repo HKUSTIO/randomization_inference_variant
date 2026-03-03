@@ -1,0 +1,36 @@
+{
+  "seed_population": 123,
+  "seed_assignment": 999,
+  "N_by_stratum": {
+    "A": 60,
+    "B": 40
+  },
+  "N1_by_stratum": {
+    "A": 30,
+    "B": 20
+  },
+  "tau_by_stratum": {
+    "A": 0.2,
+    "B": 0.6
+  },
+  "sd_y0_by_stratum": {
+    "A": 1.0,
+    "B": 1.2
+  },
+  "sd_noise_by_stratum": {
+    "A": 0.8,
+    "B": 0.8
+  },
+  "R_fisher": 400,
+  "alpha": 0.05,
+  "lambda_by_stratum": {
+    "size_weighted": {
+      "A": 0.6,
+      "B": 0.4
+    },
+    "equal_weighted": {
+      "A": 0.5,
+      "B": 0.5
+    }
+  }
+}
